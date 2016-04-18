@@ -3,6 +3,8 @@ package csvencoder
 import (
 	"github.com/mozilla-services/heka/pipeline"
 
+	"bytes"
+	"encoding/csv"
 	"fmt"
 	"strings"
 )
@@ -12,10 +14,10 @@ func init() {
 		func() interface{} { return new(CSVEncoder) })
 }
 
-var DefaultDelimiter = ","
+var DefaultDelimiter = ','
 
 type CSVEncoder struct {
-	delimiter   string
+	delimiter   rune
 	skip_fields []string
 }
 
@@ -24,7 +26,7 @@ func (e *CSVEncoder) Init(config interface{}) error {
 
 	delim, ok := conf["delimiter"]
 	if ok {
-		e.delimiter = delim.(string)
+		e.delimiter = delim.(rune)
 	} else {
 		e.delimiter = DefaultDelimiter
 	}
@@ -38,21 +40,22 @@ func (e *CSVEncoder) Init(config interface{}) error {
 }
 
 func (e *CSVEncoder) Encode(pack *pipeline.PipelinePack) ([]byte, error) {
-	var row []byte
+	row := []string{}
+	b := new(bytes.Buffer)
 	fields := pack.Message.GetFields()
+	csvWriter := csv.NewWriter(b)
+	csvWriter.Comma = e.delimiter
 
 FieldLoop:
-	for i, field := range fields {
+	for _, field := range fields {
 		for _, skip := range e.skip_fields {
 			if field.GetName() == skip {
 				continue FieldLoop
 			}
 		}
-		row = append(row, fmt.Sprint(field.GetValue())...)
-		if i < len(fields)-1 {
-			row = append(row, e.delimiter...)
-		}
+		row = append(row, fmt.Sprint(field.GetValue()))
 	}
-	row = append(row, "\n"...)
-	return row, nil
+	csvWriter.Write(row)
+	csvWriter.Flush()
+	return b.Bytes(), nil
 }

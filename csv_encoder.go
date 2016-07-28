@@ -17,8 +17,11 @@ func init() {
 var DefaultDelimiter = ','
 
 type CSVEncoder struct {
-	delimiter   rune
-	skip_fields []string
+	delimiter    rune
+	skipFields   []string
+	headerFields []string
+	buffer       *bytes.Buffer
+	csvWriter    *csv.Writer
 }
 
 func (e *CSVEncoder) Init(config interface{}) error {
@@ -33,29 +36,38 @@ func (e *CSVEncoder) Init(config interface{}) error {
 
 	skip, ok := conf["skip_fields"]
 	if ok && skip.(string) != "" {
-		e.skip_fields = strings.Split(skip.(string), " ")
+		e.skipFields = strings.Split(skip.(string), " ")
 	}
+
+	header, ok := conf["header_fields"]
+	if ok && header.(string) != "" {
+		e.headerFields = strings.Split(header.(string), " ")
+	}
+
+	e.buffer = new(bytes.Buffer)
+	e.csvWriter = csv.NewWriter(e.buffer)
+	e.csvWriter.Comma = e.delimiter
+	e.csvWriter.Write(e.headerFields)
 
 	return nil
 }
 
 func (e *CSVEncoder) Encode(pack *pipeline.PipelinePack) ([]byte, error) {
 	row := []string{}
-	b := new(bytes.Buffer)
 	fields := pack.Message.GetFields()
-	csvWriter := csv.NewWriter(b)
-	csvWriter.Comma = e.delimiter
 
 FieldLoop:
 	for _, field := range fields {
-		for _, skip := range e.skip_fields {
+		for _, skip := range e.skipFields {
 			if field.GetName() == skip {
 				continue FieldLoop
 			}
 		}
 		row = append(row, fmt.Sprint(field.GetValue()))
 	}
-	csvWriter.Write(row)
-	csvWriter.Flush()
-	return b.Bytes(), nil
+	e.csvWriter.Write(row)
+	e.csvWriter.Flush()
+	encoded := e.buffer.Bytes()
+	e.buffer.Reset()
+	return encoded, nil
 }

@@ -63,7 +63,12 @@ FieldLoop:
 				continue FieldLoop
 			}
 		}
-		row = append(row, fmt.Sprint(field.GetValue()))
+		switch field.GetValue().(type) {
+		default:
+			row = append(row, fmt.Sprint(field.GetValue()))
+		case float32, float64, complex64, complex128:
+			row = append(row, fmt.Sprintf("%f", field.GetValue()))
+		}
 	}
 	e.csvWriter.Write(row)
 	e.csvWriter.Flush()

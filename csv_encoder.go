@@ -1,3 +1,5 @@
+// Package csvencoder implements a CSV encoder plugin for the Heka data
+// processing software.
 package csvencoder
 
 import (
